@@ -1,5 +1,5 @@
 
-# 🗣️ ConvoAi
+# 🗣️ Speech-to-Text and Sentiment Analysis Using Gemini API
 
 ConvoAi is a web application built using Flask that allows users to upload audio files, transcribe them, and analyze the sentiment of the transcription using Google's Generative AI and Cloud Storage.
 
