@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text-to-Speech and Speech-to-Text</title>
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            color: #4A90E2;
+            margin-top: 30px;
+        }
+        .section {
+            margin: 20px auto;
+            padding: 20px;
+            max-width: 800px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            font-weight: bold;
+            color: #333;
+        }
+        .text-audio-container {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 50%;
+            height: 100px;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            transition: border-color 0.3s;
+        }
+        textarea:focus {
+            border-color: #4A90E2;
+            outline: none;
+        }
+        button {
+            padding: 12px 20px;
+            background-color: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #357ABD;
+        }
+        button:disabled {
+            background-color: #B0C4DE;
+            cursor: not-allowed;
+        }
+        .audio-player, .transcription-player {
+            margin-top: 20px;
+            margin-left: 10px;
+            width:50%;
+        }
+        .audio-player h3, .transcription-player h3 {
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        audio {
+            width: 100%;
+            max-width: 300px;
+        }
+        input[type="file"] {
+            padding: 10px;
+            background-color: #fff;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        input[type="file"]:hover {
+            border-color: #4A90E2;
+        }
+        .upload-transcription-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .upload-section, .transcription-section {
+            flex: 1;
+            margin-top: 10px;
+        }
+        .transcription-section h3 {
+            color: #4A90E2;
+        }
+        .recording-section {
+            margin-top: 30px;
+        }
+        #recorded_audio_player {
+            display: none;
+            margin-top: 10px;
+            align-items: center;
+        }
+        #transcription_text {
+            font-family: monospace;
+            background-color: #f7f7f7;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        #upload_recording {
+            margin-left: 20px;
+            padding: 8px 15px;
+            background-color: #28a745;
+            border-radius: 4px;
+        }
+        #upload_recording:hover {
+            background-color: #218838;
+        }
+        footer {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 0.9rem;
+            color: #777;
+        }
+        .file-container {
+            display: flex;
+            justify-content: space-between; 
+            margin-top: 20px; 
+        }
+
+        .file-container > div {
+            width: 48%; 
+        }
+        ul {
+        list-style-type: none; 
+        padding: 0; 
+        margin: 0; 
+    }
+    </style>
+</head>
+<body>
+    <h1>Speech Sentiment Analysis with Google LLM</h1>
+
+     <!-- Audio Recording Section -->
+     <div class="section recording-section">
+        <h3>Record Audio:</h3>
+        <button id="start_recording">Start Recording</button>
+        <button id="stop_recording" style="display:none;">Stop Recording</button>
+        <div id="recorded_audio_player" class="audio-player">
+            <h3>Recorded Audio:</h3>
+            <audio id="recorded_audio" controls></audio>
+            <button id="upload_recording">Upload Recording</button>
+        </div>
+        <h3>Stored Files:</h3>
+    <div class="file-container">
+        <div>
+            <h4>Audio Files:</h4>
+            <ul id="audio_list"></ul>  
+        </div>
+        <div>
+            <h4>Transcripts:</h4>
+            <ul id="transcript_list"></ul>  
+        </div>
+    </div>
+    <!-- Upload Audio Section -->
+    <div class="section">
+        <form action="/upload_audio" method="POST" enctype="multipart/form-data">
+            <div class="upload-transcription-container">
+                <div class="upload-section">
+                    <label for="audio_file">Upload audio for transcription:</label><br><br>
+                    <input type="file" id="audio_file" name="audio_file" accept="audio/wav"><br><br>
+                    <button type="submit">Upload and Transcribe</button>
+                </div>
+                <div class="file-container">
+                    <div>
+                        <h4>Audio Files:</h4>
+                        <ul id="uaudio_list"></ul>  
+                    </div>
+                    <div>
+                        <h4>Transcripts:</h4>
+                        <ul id="utranscript_list"></ul>  
+                    </div>
+                </div>
+              
+            </div>
+        </form>
+    </div>
+    <script>
+        let mediaRecorder;
+        let recordedChunks = [];
+
+        document.getElementById('start_recording').addEventListener('click', async () => {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.start();
+
+            mediaRecorder.ondataavailable = event => {
+                recordedChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(recordedChunks, { type: 'audio/wav' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                document.getElementById('recorded_audio').src = audioUrl;
+                document.getElementById('recorded_audio_player').style.display = 'flex';
+            };
+
+            document.getElementById('stop_recording').style.display = 'inline-block';
+            document.getElementById('start_recording').style.display = 'none';
+        });
+
+        document.getElementById('stop_recording').addEventListener('click', () => {
+            mediaRecorder.stop();
+            document.getElementById('stop_recording').style.display = 'none';
+            document.getElementById('start_recording').style.display = 'inline-block';
+        });
+
+        document.getElementById('upload_recording').addEventListener('click', async () => {
+            if (recordedChunks.length === 0) {
+                alert('No recording available. Please record audio first.');
+                return;
+            }
+
+            const audioBlob = new Blob(recordedChunks, { type: 'audio/wav' });
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.wav');
+
+            try {
+                const response = await fetch('/upload_recording', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.audio_url) {
+                    alert(`Recording uploaded! Access it at: ${data.audio_url}`);
+                    window.location.href = '/';
+                } else {
+                    alert('Error uploading recording: ' + (data.error || 'Unknown error'));
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error uploading recording: ' + error.message);
+            }
+
+            recordedChunks = [];
+        });
+        
+        document.querySelector('form[action="/upload_audio"]').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+
+            fetch('/upload_audio', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = '/';
+                    return response.text();
+                } else {
+                    return Promise.reject('Upload failed: ' + response.statusText);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+
+fetch('/list_files')
+        .then(response => response.json())
+        .then(data => {
+            const transcriptList = document.getElementById('transcript_list');
+            const audioList = document.getElementById('audio_list');
+            const utranscriptList = document.getElementById('utranscript_list');
+            const uaudio_list = document.getElementById('uaudio_list');
+            data.transcripts.forEach(file => {
+                const listItem = document.createElement('li');
+                const link = document.createElement('a');
+                link.href = file.url
+                link.textContent = file.name;
+                link.target = "_blank"; 
+                listItem.appendChild(link);
+                transcriptList.appendChild(listItem);
+            });
+            data.audios.forEach(file => {
+                const listItem = document.createElement('li');
+                const audioPlayer = document.createElement('audio');
+                audioPlayer.controls = true;
+                audioPlayer.src = file.url;
+                const fileName = document.createElement('p');
+                fileName.textContent = file.name;
+
+                listItem.appendChild(fileName);
+                listItem.appendChild(audioPlayer);
+                audioList.appendChild(listItem);
+            });
+
+            data.u_trans.forEach(file => {
+                const listItem = document.createElement('li');
+                const link = document.createElement('a');
+                link.href = file.url
+                link.textContent = file.name;
+                link.target = "_blank"; 
+                listItem.appendChild(link);
+                utranscriptList.appendChild(listItem);
+            });
+
+            data.u_audios.forEach(file => {
+                const listItem = document.createElement('li');
+                const audioPlayer = document.createElement('audio');
+                audioPlayer.controls = true;
+                audioPlayer.src = file.url;
+                const fileName = document.createElement('p');
+                fileName.textContent = file.name;
+                listItem.appendChild(fileName);
+                listItem.appendChild(audioPlayer);
+                uaudio_list.appendChild(listItem);
+            });
+        })
+        .catch(error => console.error('Error fetching files:', error));
+    </script>
+</body>
+</html>
